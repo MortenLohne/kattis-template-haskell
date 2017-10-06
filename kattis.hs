@@ -86,5 +86,45 @@ query tree' size idx' =
 printTree :: CountingTree -> Int -> IO ()
 printTree tree n = forM [1..n] (query tree n) >>= print
 
+-- Find between low (inclusive) and high (inclusive)
+-- If value not found, returns largest index with value smaller than target
+binarySearch :: (Int -> IO Ordering) -> Int -> Int -> IO Int
+binarySearch f low high =
+    if high - low <= 1
+    then do
+      ord <- f low
+      ord' <- f high
+      case (ord, ord') of
+       (_, LT) -> return low
+       (EQ, EQ) -> return low
+       (GT, _) -> return high
+       _ -> undefined
+    else do
+      let mid = low + (high - low) `div` 2
+      ord <- f mid
+      case ord of
+       LT -> binarySearch f low mid
+       EQ -> return mid
+       GT -> binarySearch f mid high
+
+-- Find between low (inclusive) and high (inclusive)
+-- If value not found, returns a nearby index
+binarySearchExact :: (Int -> IO Ordering) -> Int -> Int -> IO Int
+binarySearchExact f low high =
+    if high - low <= 1
+    then fmap (\ord -> if ord == EQ then high else low) (f high)
+    else do
+      let mid = low + (high - low) `div` 2
+      ord <- f mid
+      case ord of
+       LT -> binarySearchExact f low (mid - 1)
+       EQ -> return mid
+       GT -> binarySearchExact f (mid + 1) high
+
+binarySearchArray :: Ord a => IOArray Int a -> a -> IO Int
+binarySearchArray arr v = do
+  (low, high) <- getBounds arr
+  binarySearch (\i -> fmap (compare v) (readArray arr i)) low high
+
 main :: IO ()
 main = undefined
