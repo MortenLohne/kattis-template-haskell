@@ -9,6 +9,8 @@ import Data.Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C
 
+import Data.Array.IO
+
 readInt :: B.ByteString -> Int
 readInt = fst . fromJust . C.readInt
 
@@ -46,6 +48,43 @@ foldM' _ z [] = return z
 foldM' f z (x:xs) = do
   z' <- f z x
   z' `seq` foldM' f z' xs
+
+get :: (Ix i) => IOArray i e -> i -> IO e
+get = readArray
+
+put :: (Ix i) => IOArray i e -> i -> e -> IO ()
+put = writeArray
+
+mapIndex  :: (Ix i) => IOArray i e -> i -> (e -> e) -> IO ()
+mapIndex arr i f = fmap f (readArray arr i) >>= writeArray arr i
+
+type Node = Int64
+type CountingTree = IOUArray Int Node
+
+nearestPower :: Int -> Int
+nearestPower n = n .&. (-n)
+
+-- Updates all values smaller than and including idx (1-indexed)
+update :: CountingTree -> Int -> Node -> IO()
+update _ 0 _ = return ()
+update tree idx v = do
+  oldVal <- readArray tree idx
+  writeArray tree idx (oldVal + v)
+  update tree (idx - (nearestPower idx)) v
+
+-- Query a specific index (1-indexed)
+query :: CountingTree -> Int -> Int -> IO Node
+query tree' size idx' =
+  let query' :: CountingTree -> Int -> Node -> IO Node
+      query' tree idx result = 
+        if idx > size then return result
+        else do
+          val <- readArray tree idx
+          query' tree (idx + (nearestPower idx)) (val + result)
+  in query' tree' idx' 0
+
+printTree :: CountingTree -> Int -> IO ()
+printTree tree n = forM [1..n] (query tree n) >>= print
 
 main :: IO ()
 main = undefined
